@@ -1,9 +1,9 @@
 //=============================================================================
 // LC_BattleFlyWord.js
-// Version: 1.0.0
+// Version: 1.1.0
 //=============================================================================
 /*:
- * @plugindesc 战斗文字弹幕 V1.0.0
+ * @plugindesc 战斗文字弹幕 V1.1.0
  * @author 无名
  *
  * @param Window Top Y
@@ -26,6 +26,16 @@
  * @desc 弹幕滚动的最大速度
  * @default 10
  *
+ * @param Font Size
+ * @type number
+ * @desc 字体大小
+ * @default 20
+ *
+ * @param Font Color
+ * @type string
+ * @desc 字体颜色
+ * @default #FFFFFF
+
  * @help 
  * ===============================
  * 技能备注：
@@ -40,52 +50,18 @@
  * 创建插件指令
  * switch on 开启敌群战斗弹幕，默认开启
  * switch off 关闭
+ *
+ * ============================================================================
+ * Changelog
+ * ============================================================================
+ *
+ * Version 1.10:
+ * - 优化弹幕遮挡其他窗口.
+ * - 新增配置全局字体大小和颜色
+ *
+ * Version 1.00:
+ * - 初版
  */
-//=============================================================================
-// LC_FlyWindow
-//=============================================================================
-
-function LC_FlyWindow() {
-    this.initialize.apply(this, arguments);
-}
-
-LC_FlyWindow.prototype = Object.create(Window_Base.prototype);
-LC_FlyWindow.prototype.constructor = LC_FlyWindow;
-
-LC_FlyWindow.prototype.initialize = function(flyword, x, y, width, height) {
-    this._test = 500;
-    this._flyword = flyword;
-    Window_Base.prototype.initialize.call(this, x, y, width, height);
-    this.refresh();
-};
-
-LC_FlyWindow.prototype.windowWidth = function() {
-    return 240;
-};
-
-LC_FlyWindow.prototype.windowHeight = function() {
-    return this.fittingHeight(1);
-};
-LC_FlyWindow.prototype.refresh = function() {
-    this.drawFlyWord();
-};
-LC_FlyWindow.prototype.drawFlyWord = function() {
-    var widthPerFont = 30;
-    this.contents.clear();
-    this.setBackgroundType(2); // 隐藏背景
-    for (var i = 0; i < this._flyword.var.flywords.length; ++i) {
-        var flyword = this._flyword.var.flywords[i];
-        flyword.x = flyword.x - flyword.speed;
-        if(flyword.x < -(flyword.text.length * widthPerFont)){
-            this._flyword.var.flywords.splice(i, 1);
-            --i;
-        }
-        else{
-            this.drawTextEx(flyword.text, flyword.x, flyword.y);
-            this._flyword.var.flywords[i].x = flyword.x;
-        }
-    }
-};
 //=============================================================================
 // LC_BattleFlyWord
 //=============================================================================
@@ -100,6 +76,8 @@ LC_BattleFlyWord.prototype.var = {
         x : '', // 弹幕位置
         y : '', // 弹幕位置
         speed : '', // 弹幕速度
+        size : '', // 字体大小
+        color : '', // 字体颜色
     }, // 弹幕对象
     flywords: [], // 执行的弹幕数组
 };
@@ -109,7 +87,9 @@ LC_BattleFlyWord.prototype.initialize = function() {
         min_y : Number(this._Parameters['Window Top Y'] || 0), 
         max_y : Number(this._Parameters['Window Bottom Y'] || 300),
         min_speed : Number(this._Parameters['Min Speed'] || 5),
-        max_speed : Number(this._Parameters['Max Speed'] || 10) 
+        max_speed : Number(this._Parameters['Max Speed'] || 10),
+        font_size : Number(this._Parameters['Font Size'] || 20),
+        font_color : String(this._Parameters['Font Color'] || '#FFFFFF'),
     };
     this.initPluginCommand();
     this.initBattle();
@@ -140,21 +120,42 @@ LC_BattleFlyWord.prototype.initFlyWindow = function() {
         if(!that.var.switch){
             return;
         }
-        // 创建window
-        this._flyWindow = new LC_FlyWindow(that, 0, that.var.config.min_y, Graphics.boxWidth, that.var.config.max_y-that.var.config.min_y);
-        this.addWindow(this._flyWindow);
+        this._flyWindow = new Sprite(new Bitmap(Graphics.width, Graphics.height));
+        this._flyWindow.bitmap.fontSize = that.var.config.font_size;
+        this._flyWindow.bitmap.textColor = that.var.config.font_color;
+        this._flyword = that;
+        this.addChild(this._flyWindow);
     };
     // 刷新
     var Scene_Battle_update = Scene_Battle.prototype.update;
     Scene_Battle.prototype.update = function() {
         Scene_Battle_update.call(this);
-        this._flyWindow.refresh();
+        this._drawText();
     };
     // 结束
     var Scene_Battle_stop = Scene_Battle.prototype.stop;
     Scene_Battle.prototype.stop = function() {
         Scene_Battle_stop.call(this);
-        this._flyWindow.close();
+        this.removeChild(this._flyWindow);
+    };
+    Scene_Battle.prototype._drawText = function() {
+        if(!that.var.switch){
+            return;
+        }
+        this._flyWindow.bitmap.clear();
+        for (var i = 0; i < this._flyword.var.flywords.length; ++i) {
+            var flyword = this._flyword.var.flywords[i];
+            flyword.x = flyword.x - flyword.speed;
+            if(flyword.x < -(flyword.text.length * flyword.size)){
+                this._flyword.var.flywords.splice(i, 1);
+                --i;
+            }
+            else{
+                this._flyWindow.bitmap.drawText(flyword.text, flyword.x, flyword.y, Graphics.width, flyword.size, 'left');
+                this._flyword.var.flywords[i].x = flyword.x;
+            }
+        }
+        
     };
 };
 
@@ -190,6 +191,8 @@ LC_BattleFlyWord.prototype.analyzeNote = function(flywordString) {
         flyword.x = Graphics.boxWidth;
         flyword.y = this.randomNum(0, (this.var.config.max_y - this.var.config.min_y));
         flyword.speed = this.randomNum(this.var.config.min_speed, this.var.config.max_speed);
+        flyword.size = this.var.config.font_size;
+        flyword.color = this.var.config.font_color;
         this.var.flywords.push(flyword);
     }
 };

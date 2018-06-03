@@ -1,11 +1,22 @@
-var Scene_Battle_start = Scene_Battle.prototype.start;
-Scene_Battle.prototype.start = function() {
-    Scene_Battle_start.call(this);
-    this.sprite = new Sprite(new Bitmap(Graphics.width, Graphics.height));
-    this.addChild(this.sprite);
-    this.sprite.bitmap.fontSize = 72;
-    this.sprite.bitmap.drawText("123456", 20, Graphics.height-20, Graphics.width - 40, 48, 'left');
+(function(){
+	var Scene_Map_start = Scene_Map.prototype.start;
+	Scene_Map.prototype.start = function() {
+	    Scene_Map_start.call(this);
+	    this._skill = new Sprite();
+	   	this._skill.bitmap = ImageManager.loadPicture('Test');
+	   	this._skill.setFrame(0, 0, 192, 192);
+	   	this._i = 0;
+	   	this.addChild(this._skill);
+	};
+	// 更新
+	var Scene_Map_update = Scene_Map.prototype.update;
+	Scene_Map.prototype.update = function() {
+	    Scene_Map_update.call(this);
+	    if(Input.isTriggered('ok')){
+	    	this._i++;
+	    	this._skill.move(this._i, 0);
 
-    this.sprite.bitmap.fontSize = 35;
-    this.sprite.bitmap.drawText("123456", 20, Graphics.height-100, Graphics.width - 40, 48, 'left');
-};
+	    	console.log($gameMap.data());
+	    }
+	};
+})();

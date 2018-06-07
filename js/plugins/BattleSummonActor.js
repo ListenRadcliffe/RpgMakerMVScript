@@ -1,4 +1,4 @@
-//=============================================================================
+﻿//=============================================================================
 // BattleSummonActor.js
 //=============================================================================
 
@@ -25,7 +25,7 @@
 * 角色注释：
 * <summon_vanish_anime_id:[动画ID]>
 * 消失时播放动画的ID。
-*
+* 召唤单位的坐标 <summon_position:700,200>   700为X轴  200为Y轴
 * <summon_appear_anime_id:[动画ID]>
 * 召唤时动画的ID。
 * ------------------------------------------------------------------------------------------------
@@ -40,8 +40,64 @@
 * ・有可能会与操作队伍成员数量的插件产生冲突。请把这个插件放在下面。
 */
 
+
+
 (function() {
-    
+    function LC_Summon_Utils() {
+        throw new Error('This is a static class');
+    }
+
+    LC_Summon_Utils.loadImage = function(filename, hue) {
+        return ImageManager.loadBitmap('img/enemies/', filename, hue, false);
+
+    };
+
+    LC_Summon_Utils.loadNotetags = function(actor) {
+        const regex = /<LC_Summon\s*Image\s*:\s*(.*)\s*>/im;
+        const regex1 = /<LC_Summon\s*Scale\s*:\s*(.*)\s*>/im;
+        const regex2 = /<LC_Summon\s*Hue\s*:\s*(.*)\s*>/im;
+        const note = $dataActors[actor.actorId()].note;
+        actor.lc_summon_image = {
+            source : false,
+            scale : false,
+            hue : false
+        };
+        if(note.match(regex)) {
+            actor.lc_summon_image.source = String(RegExp.$1);
+        }
+        if(note.match(regex1)) {
+            actor.lc_summon_image.scale = parseFloat(RegExp.$1);
+        }
+        if(note.match(regex2)) {
+            actor.lc_summon_image.hue = parseInt(RegExp.$1);
+        }
+        return actor;
+    };
+    LC_Summon_Utils.hasSummonImage = function(actor) {
+        if(actor && actor.lc_summon_image && actor.lc_summon_image.source != false){
+            return true;
+        }
+        return false;
+    };
+    LC_Summon_Utils.summonImageSource = function(actor) {
+        if(actor && actor.lc_summon_image && actor.lc_summon_image.source != false){
+            return actor.lc_summon_image.source;
+        }
+        return false;
+    };
+    LC_Summon_Utils.summonImageHue = function(actor) {
+        if(actor && actor.lc_summon_image && actor.lc_summon_image.hue != false){
+            return actor.lc_summon_image.hue;
+        }
+        return 0;
+    };
+    LC_Summon_Utils.summonImageScale = function(actor) {
+        if(actor && actor.lc_summon_image && actor.lc_summon_image.scale != false){
+            return actor.lc_summon_image.scale;
+        }
+        return 1;
+    };
+
     var kz_Game_Party_prototype_initialize = Game_Party.prototype.initialize;
     Game_Party.prototype.initialize = function() {
         kz_Game_Party_prototype_initialize.call(this);
@@ -56,14 +112,17 @@
     Game_Party.prototype.summonActorInBattle = function(actorId, stateId, position)
     {
         this.lastSummonResult = 1;
+        // 召唤物
         var target = $gameActors.actor(actorId);
+
         if (target) {
             if (this._actors.indexOf(actorId) < 0)
             {
-                this._actors.splice(this.maxBattleMembers(),0,actorId);
+                this._actors.splice(this.maxBattleMembers(), 0, actorId);
                 this._summonMemberCount ++;
                 target._summoned = true;
                 target._summon_p = position;
+                target = LC_Summon_Utils.loadNotetags(target);
                 if (stateId > 0)
                 {
                     target._summoned_require_state = stateId;
@@ -317,6 +376,103 @@
         this.push('addText', text.format(actorName));
         this.push('wait');
         this.push('clear');
+    };
+
+    //-----------------------------------------------------------------------------
+    // Sprite_Actor
+    //-----------------------------------------------------------------------------
+
+    LC_Summon_Utils.Sprite_Actor_initialize = Sprite_Actor.prototype.initialize;
+    Sprite_Actor.prototype.initialize = function() {
+        LC_Summon_Utils.Sprite_Actor_initialize.call(this);
+        this._actionStartStuffs = ['thrust', 'swing', 'missile', 'skill', 'spell', 'item'];
+    };
+
+    LC_Summon_Utils.Sprite_Actor_updateBitmap = Sprite_Actor.prototype.updateBitmap;
+    Sprite_Actor.prototype.updateBitmap = function() {
+        if(this._battlerName !== name) {
+            this._shadowSprite.opacity = 255;
+            this._stateSprite.opacity = 255;
+            this._mainSprite.scale.set(1);
+            this._stateSprite.y = 0;
+        };
+        LC_Summon_Utils.Sprite_Actor_updateBitmap.call(this);
+        if(LC_Summon_Utils.hasSummonImage(this._actor)) {
+            if(this._staticSpriteName !== LC_Summon_Utils.summonImageSource(this._actor)) {
+                this._staticSpriteName = LC_Summon_Utils.summonImageSource(this._actor);
+                this._mainSprite.bitmap = LC_Summon_Utils.loadImage(this._staticSpriteName, LC_Summon_Utils.summonImageHue(this._actor));
+                this._mainSprite.scale.set(LC_Summon_Utils.summonImageScale(this._actor));
+                this._shadowSprite.opacity = 0;
+                this._stateSprite.opacity = 0;
+            }
+        }
+    };
+
+    LC_Summon_Utils.Sprite_Actor_updateFrame = Sprite_Actor.prototype.updateFrame;
+    Sprite_Actor.prototype.updateFrame = function() {
+        LC_Summon_Utils.Sprite_Actor_updateFrame.call(this);
+        if(LC_Summon_Utils.hasSummonImage(this._actor)) {
+            this._mainSprite.scale.set(LC_Summon_Utils.summonImageScale(this._actor));
+            const bit = this._mainSprite.bitmap;
+            this._mainSprite.setFrame(0, 0, bit.width, bit.height);
+        }
+    };
+
+    LC_Summon_Utils.Sprite_Actor_setupWeaponAnimation = Sprite_Actor.prototype.setupWeaponAnimation;
+    Sprite_Actor.prototype.setupWeaponAnimation = function() {
+        if(!LC_Summon_Utils.hasSummonImage(this._actor)) {
+            LC_Summon_Utils.Sprite_Actor_setupWeaponAnimation.call(this);
+        };
+    };
+
+    Sprite_Actor.prototype.startWhiten = function() {
+        this._effectType = 'white';
+        this._effectDuration = 16;
+    };
+
+    Sprite_Actor.prototype.startBlink = function() {
+        this._effectType = 'blink';
+        this._effectDuration = 20;
+    };
+
+    LC_Summon_Utils.Sprite_Actor_update = Sprite_Actor.prototype.update;
+    Sprite_Actor.prototype.update = function() {
+        LC_Summon_Utils.Sprite_Actor_update.call(this);
+        if(LC_Summon_Utils.hasSummonImage(this._actor)) {
+            this.updateStaticEffect();
+        }
+    };
+
+    Sprite_Actor.prototype.updateStaticEffect = function() {
+        if(this._effectType && this._effectDuration > 0) {
+            this._effectDuration--;
+            if(this._effectType === 'white') this.updateWhiten();
+            else if(this._effectType === 'blink') this.updateBlink();
+            if(this._effectDuration === 0) {
+                this._effectType = null;
+            }
+        }
+    };
+
+    Sprite_Actor.prototype.updateWhiten = function() {
+        var alpha = 128 - (16 - this._effectDuration) * 10;
+        this._mainSprite.setBlendColor([255, 255, 255, alpha]);
+    };
+
+    Sprite_Actor.prototype.updateBlink = function() {
+        this.opacity = (this._effectDuration % 10 < 5) ? 255 : 0;
+    };
+
+    LC_Summon_Utils.Sprite_Actor_startMotion = Sprite_Actor.prototype.startMotion;
+    Sprite_Actor.prototype.startMotion = function(motionType) {
+        LC_Summon_Utils.Sprite_Actor_startMotion.apply(this, arguments);
+        if(LC_Summon_Utils.hasSummonImage(this._actor)) {
+            if(motionType === 'damage') {
+                this.startBlink();
+            } else if(this._actionStartStuffs.contains(motionType)) {
+                this.startWhiten();
+            }
+        }
     };
 
 })();    

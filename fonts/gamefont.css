@@ -2,6 +2,10 @@
     font-family: GameFont;
     src: url("mplus-1m-regular.ttf");
 }
+@font-face {
+    font-family: Ink;
+    src: url("Inkfree.ttf");
+}
 
 .IIV::-webkit-media-controls-play-button,
 video::-webkit-media-controls-start-playback-button {

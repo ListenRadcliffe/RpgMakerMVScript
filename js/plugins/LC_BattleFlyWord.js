@@ -1,9 +1,9 @@
 //=============================================================================
 // LC_BattleFlyWord.js
-// Version: 1.1.0
+// Version: 1.2.0
 //=============================================================================
 /*:
- * @plugindesc 战斗文字弹幕 V1.1.0
+ * @plugindesc 战斗文字弹幕 V1.2.0
  * @author 无名
  *
  * @param Window Top Y
@@ -25,6 +25,26 @@
  * @type number
  * @desc 弹幕滚动的最大速度
  * @default 10
+ *
+ * @param Font Family
+ * @type string
+ * @desc 字体样式
+ * @default GameFont
+ *
+ * @param Font Italic
+ * @type boolean
+ * @desc 是否斜体true/false
+ * @default false
+ *
+ * @param Font Outline Color
+ * @type string
+ * @desc 边框颜色
+ * @default #FFFFFF
+ *
+ * @param Font Outline Width
+ * @type number
+ * @desc 边框宽度
+ * @default 0
  *
  * @param Font Size
  * @type number
@@ -50,10 +70,27 @@
  * 创建插件指令
  * switch on 开启敌群战斗弹幕，默认开启
  * switch off 关闭
+ * ===============================
+ * 设置新字体参照工程目录下的fonts文件夹中gamefont.css
+ * @font-face {
+ *   font-family: GameFont;
+ *   src: url("mplus-1m-regular.ttf");
+ * }
+ * @font-face {
+ *   font-family: Ink;
+ *   src: url("Inkfree.ttf");
+ * }
+ * Inkfree.ttf放在fonts目录下，Font Family配置Ink
  *
  * ============================================================================
  * Changelog
  * ============================================================================
+ *
+ * Version 1.20:
+ * - 增加字体样式，斜体，边框大小，边框颜色全局定义.
+ *
+ * Version 1.11:
+ * - 修正技能未配置弹幕出现其他字符.
  *
  * Version 1.10:
  * - 优化弹幕遮挡其他窗口.
@@ -90,6 +127,10 @@ LC_BattleFlyWord.prototype.initialize = function() {
         max_speed : Number(this._Parameters['Max Speed'] || 10),
         font_size : Number(this._Parameters['Font Size'] || 20),
         font_color : String(this._Parameters['Font Color'] || '#FFFFFF'),
+        font_family : String(this._Parameters['Font Family'] || 'GameFont'),
+        font_outline_color : String(this._Parameters['Font Outline Color'] || '#FFFFFF'),
+        font_outline_width : Number(this._Parameters['Font Outline Width'] || 0),
+        font_italic : Boolean(this._Parameters['Font Italic'] || false),
     };
     this.initPluginCommand();
     this.initBattle();
@@ -121,8 +162,13 @@ LC_BattleFlyWord.prototype.initFlyWindow = function() {
             return;
         }
         this._flyWindow = new Sprite(new Bitmap(Graphics.width, Graphics.height));
-        this._flyWindow.bitmap.fontSize = that.var.config.font_size;
         this._flyWindow.bitmap.textColor = that.var.config.font_color;
+        this._flyWindow.bitmap.fontSize = that.var.config.font_size;
+        this._flyWindow.bitmap.fontFace = that.var.config.font_family;
+        this._flyWindow.bitmap.outlineColor = that.var.config.font_outline_color;
+        this._flyWindow.bitmap.outlineWidth = that.var.config.font_outline_width;
+        this._flyWindow.bitmap.fontItalic = that.var.config.font_italic;
+        
         this._flyword = that;
         this.addChild(this._flyWindow);
     };
@@ -184,7 +230,10 @@ LC_BattleFlyWord.prototype.analyzeNote = function(flywordString) {
     var startTag = '<' + this.var.tag + '>';
     var start = flywordString.indexOf(startTag) + startTag.length;
     var end = flywordString.indexOf('</' + this.var.tag + '>');
-    var flyword_array = flywordString.substring(start, end).trim().split("\n");
+    var flyword_array = [];
+    if(start != -1 && end != -1){
+        flyword_array = flywordString.substring(start, end).trim().split("\n");
+    }
     for(var i = 0;i < flyword_array.length;++i){
         var flyword = {};
         flyword.text = flyword_array[i];
